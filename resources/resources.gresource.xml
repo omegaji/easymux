@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Files bundled inside the easymux program (a GResource).
+  The prefix matches our app ID (dev.easymux.Easymux), so GTK finds the icons
+  under /dev/easymux/Easymux/icons automatically.
+-->
+<gresources>
+  <gresource prefix="/dev/easymux/Easymux">
+    <!-- Icons from Lucide (https://lucide.dev), ISC license: see icons/LICENSE-lucide.txt -->
+    <file>icons/scalable/actions/easymux-split-right-symbolic.svg</file>
+    <file>icons/scalable/actions/easymux-split-down-symbolic.svg</file>
+    <file>icons/scalable/actions/easymux-close-pane-symbolic.svg</file>
+    <file>icons/scalable/actions/easymux-new-tab-symbolic.svg</file>
+  </gresource>
+</gresources>
