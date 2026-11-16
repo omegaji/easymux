@@ -4,6 +4,7 @@
 // They send a `Command` into a channel. One loop receives the commands and
 // applies them one at a time, so two changes can never overlap.
 
+use crate::layout::{PaneId, SplitDirection};
 use crate::pane::TabId;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -12,8 +13,12 @@ pub enum Command {
     SplitRight,
     // Split the focused pane; the new pane goes below.
     SplitDown,
+    // Split this pane (for example from its own tab bar's split button).
+    Split(PaneId, SplitDirection),
     // Open a new tab in the focused pane.
     NewTab,
+    // Open a new tab in this pane (for example from its tab bar's + button).
+    NewTabIn(PaneId),
     // Close the focused pane's active tab.
     CloseFocusedTab,
     // Show this tab (for example the user clicked it in the tab bar).

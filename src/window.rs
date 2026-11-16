@@ -21,28 +21,9 @@ pub fn build_window(app: &adw::Application, shortcuts: &GtkShortcuts) {
         sender.clone(),
     );
 
-    // The title bar, with buttons for the split actions.
+    // The title bar. Tab, split and close buttons live in each pane's own
+    // tab bar (see pane_view.rs).
     let header = adw::HeaderBar::new();
-    header.pack_start(&action_button(
-        "easymux-new-tab-symbolic",
-        "New tab",
-        "win.new-tab",
-    ));
-    header.pack_start(&action_button(
-        "easymux-split-right-symbolic",
-        "Split right",
-        "win.split-right",
-    ));
-    header.pack_start(&action_button(
-        "easymux-split-down-symbolic",
-        "Split down",
-        "win.split-down",
-    ));
-    header.pack_start(&action_button(
-        "easymux-close-pane-symbolic",
-        "Close tab",
-        "win.close-tab",
-    ));
 
     // A container with bars (like the header) around a main content area.
     let toolbar = adw::ToolbarView::new();
@@ -57,8 +38,8 @@ pub fn build_window(app: &adw::Application, shortcuts: &GtkShortcuts) {
         .content(&toolbar)
         .build();
 
-    // Window actions ("win.split-right", ...). Buttons and shortcuts trigger
-    // them by name; each one just sends its command.
+    // Window actions ("win.split-right", ...). Keyboard shortcuts trigger
+    // them by name; each one just sends its command for the focused pane.
     add_command_action(&window, "split-right", Command::SplitRight, &sender);
     add_command_action(&window, "split-down", Command::SplitDown, &sender);
     add_command_action(&window, "new-tab", Command::NewTab, &sender);
@@ -86,15 +67,6 @@ pub fn build_window(app: &adw::Application, shortcuts: &GtkShortcuts) {
             }
         }
     });
-}
-
-// A header-bar button with an icon and a tooltip, that triggers
-// the action called `action_name` when clicked.
-fn action_button(icon_name: &str, tooltip: &str, action_name: &str) -> gtk::Button {
-    let button = gtk::Button::from_icon_name(icon_name);
-    button.set_tooltip_text(Some(tooltip));
-    button.set_action_name(Some(action_name));
-    button
 }
 
 // A window action called `name` that sends `command` when triggered.

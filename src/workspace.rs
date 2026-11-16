@@ -15,6 +15,7 @@ use gtk::prelude::*;
 use crate::commands::{Command, CommandSender};
 use crate::layout::{CloseResult, Layout, Node, PaneId, SplitDirection};
 use crate::pane::{Pane, TabCloseResult, TabId};
+use crate::pane_view::PaneView;
 use crate::settings::TerminalSettings;
 use crate::shortcuts::GtkShortcuts;
 use crate::terminal::Terminal;
@@ -27,14 +28,6 @@ pub enum Outcome {
     Continue,
     // The last tab of the last pane was closed: the workspace is empty.
     Empty,
-}
-
-// The widgets of one pane. For now just a stack that shows the active tab's
-// terminal (a `gtk::Stack` holds many widgets but shows one at a time).
-// The tab bar will go above it.
-struct PaneView {
-    container: gtk::Box,
-    stack: gtk::Stack,
 }
 
 pub struct Workspace {
@@ -100,7 +93,12 @@ impl Workspace {
         match command {
             Command::SplitRight => self.split(self.focused, SplitDirection::Right),
             Command::SplitDown => self.split(self.focused, SplitDirection::Down),
+            Command::Split(pane, direction) => self.split(pane, direction),
             Command::NewTab => self.new_tab(self.focused),
+            Command::NewTabIn(pane) => {
+                self.focused = pane;
+                self.new_tab(pane);
+            }
             Command::CloseFocusedTab => {
                 if let Some(pane) = self.panes.get(&self.focused) {
                     return self.close_tab(pane.active());
@@ -134,6 +132,7 @@ impl Workspace {
         if let Some(pane_tabs) = self.panes.get_mut(&pane) {
             pane_tabs.add(tab);
         }
+        self.refresh_tab_bar(pane);
         self.show_active_tab(pane);
     }
 
@@ -146,6 +145,7 @@ impl Workspace {
             pane_tabs.activate(tab);
         }
         self.focused = pane;
+        self.refresh_tab_bar(pane);
         self.show_active_tab(pane);
     }
 
@@ -163,6 +163,7 @@ impl Workspace {
         match pane_tabs.close(tab) {
             TabCloseResult::Closed => {
                 self.remove_terminal(pane, tab);
+                self.refresh_tab_bar(pane);
                 self.show_active_tab(pane);
                 Outcome::Continue
             }
@@ -204,14 +205,12 @@ impl Workspace {
 
     // Create the tabs and widgets for a new pane, with one new tab.
     fn add_pane(&mut self, pane: PaneId) {
-        let stack = gtk::Stack::new();
-        stack.set_vexpand(true); // the terminals take all the height
-        let container = gtk::Box::new(gtk::Orientation::Vertical, 0);
-        container.append(&stack);
-        self.views.insert(pane, PaneView { container, stack });
+        self.views
+            .insert(pane, PaneView::new(pane, self.commands.clone()));
 
         let tab = self.add_terminal(pane);
         self.panes.insert(pane, Pane::new(tab));
+        self.refresh_tab_bar(pane);
         self.show_active_tab(pane);
     }
 
@@ -222,7 +221,7 @@ impl Workspace {
 
         let terminal = self.new_terminal(tab);
         if let Some(view) = self.views.get(&pane) {
-            view.stack.add_child(terminal.widget());
+            view.add_terminal(terminal.widget());
         }
         self.terminals.insert(tab, terminal);
         tab
@@ -234,8 +233,22 @@ impl Workspace {
             return;
         };
         if let Some(view) = self.views.get(&pane) {
-            view.stack.remove(terminal.widget());
+            view.remove_terminal(terminal.widget());
         }
+    }
+
+    // Redraw `pane`'s tab bar from its tab list.
+    // (Titles are a placeholder for now; real titles come next.)
+    fn refresh_tab_bar(&self, pane: PaneId) {
+        let (Some(pane_tabs), Some(view)) = (self.panes.get(&pane), self.views.get(&pane)) else {
+            return;
+        };
+        let tabs: Vec<(TabId, String)> = pane_tabs
+            .tabs()
+            .iter()
+            .map(|tab| (*tab, "Terminal".to_string()))
+            .collect();
+        view.update_tabs(&tabs, pane_tabs.active());
     }
 
     // Show `pane`'s active tab. If `pane` is the focused pane, also give its
@@ -247,7 +260,7 @@ impl Workspace {
         let Some(terminal) = self.terminals.get(&pane_tabs.active()) else {
             return;
         };
-        view.stack.set_visible_child(terminal.widget());
+        view.show_terminal(terminal.widget());
         if pane == self.focused {
             terminal.grab_focus();
         }
@@ -301,7 +314,7 @@ impl Workspace {
     // Turn one node of the tree into a widget.
     fn build(&self, node: &Node) -> gtk::Widget {
         match node {
-            Node::Pane(id) => self.views[id].container.clone().upcast(),
+            Node::Pane(id) => self.views[id].widget().clone(),
             Node::Split {
                 direction,
                 first,

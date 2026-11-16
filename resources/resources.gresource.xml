@@ -6,6 +6,8 @@
 -->
 <gresources>
   <gresource prefix="/dev/easymux/Easymux">
+    <!-- Our stylesheet. libadwaita loads "style.css" from here automatically. -->
+    <file>style.css</file>
     <!-- Icons from Lucide (https://lucide.dev), ISC license: see icons/LICENSE-lucide.txt -->
     <file>icons/scalable/actions/easymux-split-right-symbolic.svg</file>
     <file>icons/scalable/actions/easymux-split-down-symbolic.svg</file>

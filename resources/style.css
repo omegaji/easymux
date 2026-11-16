@@ -1,0 +1,54 @@
+/*
+ * easymux styles. libadwaita loads this automatically from our bundle.
+ *
+ * Colors are hand-picked to match the Rose Pine terminal theme for now.
+ * Later they should come from the active `Theme`.
+ */
+
+/* The bar above each pane: tabs on the left, buttons on the right. */
+.pane-bar {
+  background-color: #1f1d2e; /* a bit lighter than the terminal background */
+  border-bottom: 1px solid alpha(white, 0.06);
+  min-height: 30px;
+}
+
+/* One tab: a flat rectangle with sharp edges and a thin separator. */
+.tab {
+  padding: 0 4px 0 12px;
+  border-right: 1px solid alpha(white, 0.06);
+  color: alpha(white, 0.55);
+  font-size: 12px;
+}
+
+.tab:hover {
+  background-color: alpha(white, 0.04);
+}
+
+/* The active tab has the terminal's own background, so it "opens into" it. */
+.tab.active {
+  background-color: #191724;
+  color: #e0def4;
+}
+
+/* A tab's ✕: only shown on the active tab, and on the tab under the mouse. */
+.tab .tab-close {
+  opacity: 0;
+}
+
+.tab.active .tab-close,
+.tab:hover .tab-close {
+  opacity: 1;
+}
+
+/* Small square buttons in the bar: a tab's ✕, and + / split on the right. */
+.pane-bar button {
+  min-width: 22px;
+  min-height: 22px;
+  padding: 0;
+  margin: 4px 2px;
+  border-radius: 4px;
+}
+
+.pane-bar button image {
+  -gtk-icon-size: 14px;
+}

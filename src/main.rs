@@ -2,6 +2,7 @@ mod commands;
 mod keybindings;
 mod layout;
 mod pane;
+mod pane_view;
 mod settings;
 mod shortcuts;
 mod terminal;
@@ -29,6 +30,9 @@ fn main() -> gtk::glib::ExitCode {
     // "startup" fires once, when GTK is ready. We create the shared shortcuts
     // here, so every window (and every terminal in it) uses the same list.
     app.connect_startup(|app| {
+        // Always dark, to match the dark terminal theme (a setting later).
+        adw::StyleManager::default().set_color_scheme(adw::ColorScheme::ForceDark);
+
         let shortcuts = GtkShortcuts::new(&Keybindings::defaults());
 
         // "activate" fires when the app should show a window.

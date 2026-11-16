@@ -1,16 +1,5 @@
-<!-- @license lucide-static v1.66.0 - ISC -->
-<svg
-  class="lucide lucide-plus"
-  xmlns="http://www.w3.org/2000/svg"
-  width="24"
-  height="24"
-  viewBox="0 0 24 24"
-  fill="none"
-  stroke="currentColor"
-  stroke-width="2"
-  stroke-linecap="round"
-  stroke-linejoin="round"
->
-  <path d="M5 12h14" />
-  <path d="M12 5v14" />
+<!-- Based on Lucide (https://lucide.dev), ISC license: see icons/LICENSE-lucide.txt. Redrawn as filled shapes so GTK can recolor it. -->
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
+  <rect x="11" y="4" width="2" height="16" rx="1"/>
+  <rect x="4" y="11" width="16" height="2" rx="1"/>
 </svg>
