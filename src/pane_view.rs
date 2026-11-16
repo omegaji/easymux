@@ -88,6 +88,15 @@ impl PaneView {
         container.append(&bar);
         container.append(&stack);
 
+        // Scrolling over a pane belongs to the pane: its terminal (history, or
+        // the program running in it) or its tab strip. Whatever they leave
+        // over is swallowed here, so it never moves the workspace. The
+        // workspace only scrolls by dragging its scrollbars.
+        let keep_scrolls =
+            gtk::EventControllerScroll::new(gtk::EventControllerScrollFlags::BOTH_AXES);
+        keep_scrolls.connect_scroll(|_controller, _dx, _dy| glib::Propagation::Stop);
+        container.add_controller(keep_scrolls);
+
         Self {
             container,
             tabs,
@@ -200,12 +209,18 @@ fn command_button(
 
 // Let a normal mouse wheel (up/down) scroll the tabs sideways. GTK only does
 // that by itself while Shift is held; trackpad sideways swipes already work.
+// Only when the tabs don't fit: otherwise the scroll goes on to the
+// workspace, so scrolling over a tab bar moves the workspace.
 fn scroll_sideways_with_wheel(scroller: &gtk::ScrolledWindow) {
     let wheel = gtk::EventControllerScroll::new(gtk::EventControllerScrollFlags::VERTICAL);
     // The closure holds the adjustment (the scroll position), not the
     // scroller itself, so there is no reference cycle.
     let position = scroller.hadjustment();
     wheel.connect_scroll(move |wheel, _dx, dy| {
+        let tabs_overflow = position.upper() - position.lower() > position.page_size();
+        if !tabs_overflow {
+            return glib::Propagation::Proceed; // nothing to scroll here
+        }
         let step = if wheel.unit() == gdk::ScrollUnit::Wheel {
             WHEEL_STEP
         } else {

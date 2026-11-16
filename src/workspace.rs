@@ -77,9 +77,13 @@ impl Workspace {
         let root = gtk::Box::new(gtk::Orientation::Vertical, 0);
         // Scrollbars only appear when needed. The scroll area itself only
         // asks for a small size, so the window never grows to fit the panes.
+        // The workspace only scrolls by dragging its scrollbars (scrolling
+        // over a pane belongs to the pane, see pane_view.rs), so the
+        // scrollbars stay visible instead of fading out ("overlay" style).
         let scroller = gtk::ScrolledWindow::builder()
             .hscrollbar_policy(gtk::PolicyType::Automatic)
             .vscrollbar_policy(gtk::PolicyType::Automatic)
+            .overlay_scrolling(false)
             .child(&root)
             .build();
 
