@@ -185,17 +185,19 @@ impl Terminal {
         });
     }
 
-    // Start `shell` (e.g. "/bin/zsh") inside the terminal, with `environment`
-    // ("NAME=value" entries) added to the environment it inherits.
-    pub fn spawn_shell(&self, shell: &str, environment: &[String]) {
+    // Start a program inside the terminal. `arguments` is the program and
+    // its arguments (e.g. ["/bin/bash", "--rcfile", "..."]); `environment`
+    // ("NAME=value" entries) is added to the environment it inherits.
+    pub fn spawn(&self, arguments: &[String], environment: &[String]) {
         let home = gtk::glib::home_dir();
-        // VTE wants a list of `&str`, so borrow each `String` as one.
+        // VTE wants lists of `&str`, so borrow each `String` as one.
+        let arguments: Vec<&str> = arguments.iter().map(String::as_str).collect();
         let environment: Vec<&str> = environment.iter().map(String::as_str).collect();
 
         self.vte.spawn_async(
             vte::PtyFlags::DEFAULT,
             home.to_str(), // start in the home folder
-            &[shell],      // the command to run
+            &arguments,    // the program to run, with its arguments
             &environment,  // extra environment variables
             gtk::glib::SpawnFlags::DEFAULT,
             || {},                          // nothing extra to set up in the child

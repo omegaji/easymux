@@ -339,8 +339,8 @@ impl Workspace {
 
         // Start the user's shell, with our shell integration when we have it.
         let shell = shell_integration::user_shell();
-        let environment = self.shell_integration.environment_for(&shell);
-        terminal.spawn_shell(&shell, &environment);
+        let command = self.shell_integration.command_for(&shell);
+        terminal.spawn(&command.arguments, &command.environment);
         terminal
     }
 

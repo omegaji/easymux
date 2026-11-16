@@ -53,12 +53,18 @@ impl GtkShortcuts {
     }
 }
 
-// The GTK action each of our actions triggers.
-// These must match the actions the terminal defines (group "term").
+// The GTK action each of our actions triggers. These must match the actions
+// defined elsewhere: "term.*" by each terminal (terminal/mod.rs), "win.*" by
+// the window (window.rs). GTK looks for the name on the focused terminal and
+// all its parents, up to the window, so terminal shortcuts reach both.
 fn gtk_action_name(action: Action) -> &'static str {
     match action {
         Action::Copy => "term.copy",
         Action::Paste => "term.paste",
+        Action::SplitRight => "win.split-right",
+        Action::SplitDown => "win.split-down",
+        Action::NewTab => "win.new-tab",
+        Action::CloseTab => "win.close-tab",
     }
 }
 

@@ -11,13 +11,48 @@ use std::collections::HashMap;
 pub enum Action {
     Copy,
     Paste,
+    SplitRight,
+    SplitDown,
+    NewTab,
+    CloseTab,
 }
 
 impl Action {
     // Every action, so other code can loop over all of them.
     // When you add an action above, add it here too.
-    pub const ALL: [Action; 2] = [Action::Copy, Action::Paste];
+    pub const ALL: [Action; 6] = [
+        Action::Copy,
+        Action::Paste,
+        Action::SplitRight,
+        Action::SplitDown,
+        Action::NewTab,
+        Action::CloseTab,
+    ];
 }
+
+// The default shortcuts, the same as Ghostty's (so they feel familiar to
+// cmux users). macOS uses Cmd. Linux uses Ctrl+Shift, because plain Ctrl+key
+// combinations belong to the programs in the terminal (Ctrl+C stops the
+// running program, Ctrl+D ends the shell, Ctrl+W deletes a word, ...).
+#[cfg(target_os = "macos")]
+const DEFAULTS: &[(Action, &str)] = &[
+    (Action::Copy, "Cmd+C"),
+    (Action::Paste, "Cmd+V"),
+    (Action::SplitRight, "Cmd+D"),
+    (Action::SplitDown, "Cmd+Shift+D"),
+    (Action::NewTab, "Cmd+T"),
+    (Action::CloseTab, "Cmd+W"),
+];
+
+#[cfg(not(target_os = "macos"))]
+const DEFAULTS: &[(Action, &str)] = &[
+    (Action::Copy, "Ctrl+Shift+C"),
+    (Action::Paste, "Ctrl+Shift+V"),
+    (Action::SplitRight, "Ctrl+Shift+O"),
+    (Action::SplitDown, "Ctrl+Shift+E"),
+    (Action::NewTab, "Ctrl+Shift+T"),
+    (Action::CloseTab, "Ctrl+Shift+W"),
+];
 
 // The table: for each action, the keys that trigger it.
 #[derive(Debug, Clone)]
@@ -26,19 +61,12 @@ pub struct Keybindings {
 }
 
 impl Keybindings {
-    // The default shortcuts.
-    // Linux uses Ctrl+Shift, because plain Ctrl+C must reach the shell
-    // (it stops the running program). macOS uses Cmd.
+    // The default shortcuts for this system (see `DEFAULTS` above).
     pub fn defaults() -> Self {
-        let (copy, paste) = if cfg!(target_os = "macos") {
-            ("Cmd+C", "Cmd+V")
-        } else {
-            ("Ctrl+Shift+C", "Ctrl+Shift+V")
-        };
-
-        let mut keys = HashMap::new();
-        keys.insert(Action::Copy, copy.to_string());
-        keys.insert(Action::Paste, paste.to_string());
+        let keys = DEFAULTS
+            .iter()
+            .map(|(action, keys)| (*action, keys.to_string()))
+            .collect();
         Self { keys }
     }
 
@@ -59,10 +87,21 @@ mod tests {
     use super::*;
 
     #[test]
-    fn defaults_have_copy_and_paste() {
+    fn every_action_has_a_default() {
         let bindings = Keybindings::defaults();
-        assert!(bindings.keys_for(Action::Copy).is_some());
-        assert!(bindings.keys_for(Action::Paste).is_some());
+        for action in Action::ALL {
+            assert!(bindings.keys_for(action).is_some(), "{action:?} has no default");
+        }
+    }
+
+    #[test]
+    fn no_two_actions_share_the_same_default_keys() {
+        let bindings = Keybindings::defaults();
+        let mut seen = std::collections::HashSet::new();
+        for action in Action::ALL {
+            let keys = bindings.keys_for(action).unwrap();
+            assert!(seen.insert(keys), "{keys} is used twice");
+        }
     }
 
     #[test]
