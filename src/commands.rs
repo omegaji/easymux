@@ -27,6 +27,8 @@ pub enum Command {
     CloseTab(TabId),
     // A tab's terminal received keyboard focus (sent by the terminal itself).
     TabFocused(TabId),
+    // A tab's title or current folder changed (sent by the terminal itself).
+    TabTitleChanged(TabId),
     // The shell in a tab exited, for example the user typed "exit"
     // (sent by the terminal itself).
     TabExited(TabId),

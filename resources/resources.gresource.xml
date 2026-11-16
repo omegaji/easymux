@@ -8,6 +8,10 @@
   <gresource prefix="/dev/easymux/Easymux">
     <!-- Our stylesheet. libadwaita loads "style.css" from here automatically. -->
     <file>style.css</file>
+    <!-- Shell integration scripts. Written out to a cache folder at startup,
+         because shells can only load real files. -->
+    <file>shell-integration/zsh/.zshenv</file>
+    <file>shell-integration/zsh/easymux.zsh</file>
     <!-- Icons from Lucide (https://lucide.dev), ISC license: see icons/LICENSE-lucide.txt -->
     <file>icons/scalable/actions/easymux-split-right-symbolic.svg</file>
     <file>icons/scalable/actions/easymux-split-down-symbolic.svg</file>

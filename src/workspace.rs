@@ -17,9 +17,11 @@ use crate::layout::{CloseResult, Layout, Node, PaneId, SplitDirection};
 use crate::pane::{Pane, TabCloseResult, TabId};
 use crate::pane_view::PaneView;
 use crate::settings::TerminalSettings;
+use crate::shell_integration::{self, ShellIntegration};
 use crate::shortcuts::GtkShortcuts;
 use crate::terminal::Terminal;
 use crate::theme::Theme;
+use crate::title;
 
 // What the window should do after a command.
 #[derive(Debug, PartialEq, Eq)]
@@ -37,10 +39,17 @@ pub struct Workspace {
     views: HashMap<PaneId, PaneView>,
     // Each tab's terminal.
     terminals: HashMap<TabId, Terminal>,
+    // Names the user gave to tabs. They override the automatic titles.
+    // (Empty for now: the rename feature comes later.)
+    tab_names: HashMap<TabId, String>,
     // The number for the next new tab.
     next_tab: u32,
-    // The one widget the window shows. Its content is replaced on every rebuild.
+    // Holds the layout widgets. Its content is replaced on every rebuild.
     root: gtk::Box,
+    // What the window shows: `root` inside a scroll area. If the panes need
+    // more room than the window has (each pane has a minimum size), the
+    // workspace scrolls instead of making the window bigger.
+    scroller: gtk::ScrolledWindow,
     // The pane that has (or last had) keyboard focus. Commands like
     // "split" and "new tab" act on it.
     focused: PaneId,
@@ -50,6 +59,7 @@ pub struct Workspace {
     shortcuts: GtkShortcuts,
     settings: TerminalSettings,
     theme: Theme,
+    shell_integration: ShellIntegration,
 }
 
 impl Workspace {
@@ -58,23 +68,36 @@ impl Workspace {
         shortcuts: &GtkShortcuts,
         settings: TerminalSettings,
         theme: Theme,
+        shell_integration: ShellIntegration,
         commands: CommandSender,
     ) -> Self {
         let layout = Layout::new();
         let first_pane = layout.panes()[0];
+
+        let root = gtk::Box::new(gtk::Orientation::Vertical, 0);
+        // Scrollbars only appear when needed. The scroll area itself only
+        // asks for a small size, so the window never grows to fit the panes.
+        let scroller = gtk::ScrolledWindow::builder()
+            .hscrollbar_policy(gtk::PolicyType::Automatic)
+            .vscrollbar_policy(gtk::PolicyType::Automatic)
+            .child(&root)
+            .build();
 
         let mut workspace = Self {
             layout,
             panes: HashMap::new(),
             views: HashMap::new(),
             terminals: HashMap::new(),
+            tab_names: HashMap::new(),
             next_tab: 0,
-            root: gtk::Box::new(gtk::Orientation::Vertical, 0),
+            root,
+            scroller,
             focused: first_pane,
             commands,
             shortcuts: shortcuts.clone(),
             settings,
             theme,
+            shell_integration,
         };
 
         workspace.add_pane(first_pane);
@@ -84,7 +107,7 @@ impl Workspace {
 
     // The widget to place inside a window.
     pub fn widget(&self) -> &gtk::Widget {
-        self.root.upcast_ref()
+        self.scroller.upcast_ref()
     }
 
     // Apply one command. This is the only way to change a workspace from
@@ -109,6 +132,11 @@ impl Workspace {
             Command::TabFocused(tab) => {
                 if let Some(pane) = self.pane_of(tab) {
                     self.focused = pane;
+                }
+            }
+            Command::TabTitleChanged(tab) => {
+                if let Some(pane) = self.pane_of(tab) {
+                    self.refresh_tab_bar(pane);
                 }
             }
         }
@@ -186,6 +214,7 @@ impl Workspace {
         if let Some(pane_tabs) = self.panes.remove(&pane) {
             for tab in pane_tabs.tabs() {
                 self.terminals.remove(tab);
+                self.tab_names.remove(tab);
             }
         }
         self.views.remove(&pane);
@@ -229,6 +258,7 @@ impl Workspace {
 
     // Drop `tab`'s terminal and take it out of `pane`'s stack.
     fn remove_terminal(&mut self, pane: PaneId, tab: TabId) {
+        self.tab_names.remove(&tab);
         let Some(terminal) = self.terminals.remove(&tab) else {
             return;
         };
@@ -237,8 +267,8 @@ impl Workspace {
         }
     }
 
-    // Redraw `pane`'s tab bar from its tab list.
-    // (Titles are a placeholder for now; real titles come next.)
+    // Redraw `pane`'s tab bar from its tab list. Each tab's title follows
+    // the priority rule in title.rs: custom name > automatic title > default.
     fn refresh_tab_bar(&self, pane: PaneId) {
         let (Some(pane_tabs), Some(view)) = (self.panes.get(&pane), self.views.get(&pane)) else {
             return;
@@ -246,7 +276,14 @@ impl Workspace {
         let tabs: Vec<(TabId, String)> = pane_tabs
             .tabs()
             .iter()
-            .map(|tab| (*tab, "Terminal".to_string()))
+            .map(|tab| {
+                let custom = self.tab_names.get(tab).map(String::as_str);
+                let automatic = self
+                    .terminals
+                    .get(tab)
+                    .and_then(|terminal| terminal.automatic_title());
+                (*tab, title::tab_title(custom, automatic.as_deref()))
+            })
             .collect();
         view.update_tabs(&tabs, pane_tabs.active());
     }
@@ -291,8 +328,15 @@ impl Workspace {
         terminal.connect_exited(move || {
             let _ = commands.try_send(Command::TabExited(tab));
         });
+        let commands = self.commands.clone();
+        terminal.connect_title_changed(move || {
+            let _ = commands.try_send(Command::TabTitleChanged(tab));
+        });
 
-        terminal.spawn_shell();
+        // Start the user's shell, with our shell integration when we have it.
+        let shell = shell_integration::user_shell();
+        let environment = self.shell_integration.environment_for(&shell);
+        terminal.spawn_shell(&shell, &environment);
         terminal
     }
 
@@ -325,6 +369,12 @@ impl Workspace {
                     SplitDirection::Down => gtk::Orientation::Vertical,
                 };
                 let paned = gtk::Paned::new(orientation);
+
+                // Never squeeze a side below its minimum size: dragging the
+                // divider stops there. (GTK's default lets sides shrink to
+                // almost nothing, which made panes "vanish".)
+                paned.set_shrink_start_child(false);
+                paned.set_shrink_end_child(false);
 
                 // Start the divider in the middle. GTK only knows the size once
                 // the divider is laid out, and then announces it as

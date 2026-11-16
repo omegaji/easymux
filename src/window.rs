@@ -5,11 +5,16 @@ use gtk::{gio, glib};
 
 use crate::commands::{Command, CommandSender};
 use crate::settings::TerminalSettings;
+use crate::shell_integration::ShellIntegration;
 use crate::shortcuts::GtkShortcuts;
 use crate::theme::Theme;
 use crate::workspace::{Outcome, Workspace};
 
-pub fn build_window(app: &adw::Application, shortcuts: &GtkShortcuts) {
+pub fn build_window(
+    app: &adw::Application,
+    shortcuts: &GtkShortcuts,
+    shell_integration: &ShellIntegration,
+) {
     // The command channel: buttons, shortcuts and terminals send commands
     // into `sender`; the loop below receives them from `receiver`.
     let (sender, receiver) = async_channel::unbounded::<Command>();
@@ -18,6 +23,7 @@ pub fn build_window(app: &adw::Application, shortcuts: &GtkShortcuts) {
         shortcuts,
         TerminalSettings::default(),
         Theme::rose_pine(),
+        shell_integration.clone(),
         sender.clone(),
     );
 

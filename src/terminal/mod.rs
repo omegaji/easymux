@@ -4,23 +4,53 @@
 // That way we can replace VTE later (for example with libghostty) by
 // changing only this file.
 
+use std::cell::Cell;
+use std::rc::Rc;
+
 use gtk::gio;
 use gtk::prelude::*;
 use vte::prelude::*;
 
 use crate::shortcuts::GtkShortcuts;
 use crate::theme::{Color, Theme};
+use crate::title;
+
+// Names of the values the shell can set (VTE calls them "termprops").
+const TITLE: &str = "xterm.title"; // the title, set with an escape code (OSC 0/2)
+const CURRENT_FOLDER: &str = "vte.cwd"; // the current folder (OSC 7)
+
+// Which of the two the shell (or a program) changed most recently.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum LatestTitle {
+    Nothing, // neither was set yet
+    Title,   // e.g. "cargo run", or Claude Code's own title
+    Folder,  // e.g. ".../omji/my_work/easymux"
+}
 
 pub struct Terminal {
     vte: vte::Terminal,
     // What the window shows: the terminal with its scrollbar beside it.
     container: gtk::Box,
+    // Which one to show: "most recent wins". Shared with the closure in `new`
+    // that updates it, hence `Rc<Cell<...>>`.
+    latest_title: Rc<Cell<LatestTitle>>,
 }
 
 impl Terminal {
     pub fn new(shortcuts: &GtkShortcuts) -> Self {
         let vte = vte::Terminal::new();
         add_actions(&vte);
+
+        // Remember whether the title or the folder changed last.
+        let latest_title = Rc::new(Cell::new(LatestTitle::Nothing));
+        let latest_for_closure = latest_title.clone();
+        vte.connect_termprop_changed(None, move |_terminal, name| {
+            if name == TITLE {
+                latest_for_closure.set(LatestTitle::Title);
+            } else if name == CURRENT_FOLDER {
+                latest_for_closure.set(LatestTitle::Folder);
+            }
+        });
 
         // Listen to the shared shortcut list. When it changes (for example from
         // settings), this terminal picks up the new keys automatically.
@@ -56,7 +86,11 @@ impl Terminal {
         container.append(&vte);
         container.append(&scrollbar);
 
-        Self { vte, container }
+        Self {
+            vte,
+            container,
+            latest_title,
+        }
     }
 
     // The widget to place inside a window.
@@ -114,17 +148,55 @@ impl Terminal {
             .connect_child_exited(move |_terminal, _status| callback());
     }
 
-    // Start the user's shell (zsh, bash, ...) inside the terminal.
-    pub fn spawn_shell(&self) {
-        // $SHELL holds the user's shell. Fall back to /bin/sh if it is not set.
-        let shell = std::env::var("SHELL").unwrap_or_else(|_| "/bin/sh".to_string());
+    // The automatic title for this terminal's tab: whichever changed most
+    // recently, the title (set by the shell or a program) or the current
+    // folder. `None` if neither was set yet.
+    pub fn automatic_title(&self) -> Option<String> {
+        match self.latest_title.get() {
+            LatestTitle::Title => self.shell_title().or_else(|| self.folder_title()),
+            LatestTitle::Folder => self.folder_title().or_else(|| self.shell_title()),
+            LatestTitle::Nothing => None,
+        }
+    }
+
+    // The title set with OSC 0/2, if any.
+    fn shell_title(&self) -> Option<String> {
+        let (text, _length) = self.vte.termprop_string(TITLE);
+        text.map(|text| text.to_string()).filter(|text| !text.is_empty())
+    }
+
+    // The current folder reported with OSC 7, shortened, if any.
+    fn folder_title(&self) -> Option<String> {
+        // The vte4 library can't read the "vte.cwd" value directly yet, so we
+        // use the older function, which returns the same value.
+        #[allow(deprecated)]
+        let uri = self.vte.current_directory_uri()?;
+        // "file:///Users/om/projects" -> "/Users/om/projects"
+        let (path, _host) = gtk::glib::filename_from_uri(&uri).ok()?;
+        Some(title::short_path(&path, &gtk::glib::home_dir()))
+    }
+
+    // Run `callback` whenever the title or the current folder changes.
+    pub fn connect_title_changed<F: Fn() + 'static>(&self, callback: F) {
+        self.vte.connect_termprop_changed(None, move |_terminal, name| {
+            if name == TITLE || name == CURRENT_FOLDER {
+                callback();
+            }
+        });
+    }
+
+    // Start `shell` (e.g. "/bin/zsh") inside the terminal, with `environment`
+    // ("NAME=value" entries) added to the environment it inherits.
+    pub fn spawn_shell(&self, shell: &str, environment: &[String]) {
         let home = gtk::glib::home_dir();
+        // VTE wants a list of `&str`, so borrow each `String` as one.
+        let environment: Vec<&str> = environment.iter().map(String::as_str).collect();
 
         self.vte.spawn_async(
             vte::PtyFlags::DEFAULT,
             home.to_str(), // start in the home folder
-            &[&shell],     // the command to run
-            &[],           // no extra environment variables
+            &[shell],      // the command to run
+            &environment,  // extra environment variables
             gtk::glib::SpawnFlags::DEFAULT,
             || {},                          // nothing extra to set up in the child
             -1,                             // use VTE's default time limit for starting
