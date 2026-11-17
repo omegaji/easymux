@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <!-- easymux logo: the letter "e" drawn as terminal panes, with a cursor.
+       Colors from the Rose Pine theme. -->
+
+  <!-- App icon background: a dark rounded square. -->
+  <rect width="512" height="512" rx="112" fill="#191724"/>
+
+  <!-- The top pane, softly tinted like a focused pane. -->
+  <path d="M 128 256 V 168 A 40 40 0 0 1 168 128 H 344 A 40 40 0 0 1 384 168 V 256 Z"
+        fill="#c4a7e7" fill-opacity="0.18"/>
+
+  <!-- A terminal cursor in the top pane. -->
+  <rect x="176" y="164" width="30" height="56" rx="4" fill="#ebbcba"/>
+
+  <!-- The "e" as a terminal window: an almost closed window, split into two
+       panes by the middle line. Its outline turns the bottom-right corner and
+       climbs back up, stopping just short of the middle line: that small gap
+       is what makes the window read as an "e". -->
+  <path d="M 128 256 H 384 V 168 A 40 40 0 0 0 344 128 H 168 A 40 40 0 0 0 128 168
+           V 344 A 40 40 0 0 0 168 384 H 344 A 40 40 0 0 0 384 344 V 322"
+        fill="none" stroke="#e0def4" stroke-width="36"
+        stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

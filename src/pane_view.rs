@@ -82,8 +82,11 @@ impl PaneView {
 
         let stack = gtk::Stack::new();
         stack.set_vexpand(true); // the terminals take all the height
+        stack.add_css_class("pane-terminals");
 
+        // "pane" (and "focused", see `set_focused`) are used in style.css.
         let container = gtk::Box::new(gtk::Orientation::Vertical, 0);
+        container.add_css_class("pane");
         container.set_size_request(MIN_PANE_WIDTH, MIN_PANE_HEIGHT);
         container.append(&bar);
         container.append(&stack);
@@ -119,6 +122,16 @@ impl PaneView {
     // Take a tab's terminal widget out of the stack.
     pub fn remove_terminal(&self, terminal: &gtk::Widget) {
         self.stack.remove(terminal);
+    }
+
+    // Mark this pane as the one with keyboard focus (or not). The look comes
+    // from the "focused" style in style.css: other panes are dimmed.
+    pub fn set_focused(&self, focused: bool) {
+        if focused {
+            self.container.add_css_class("focused");
+        } else {
+            self.container.remove_css_class("focused");
+        }
     }
 
     // Show this terminal (the active tab's).

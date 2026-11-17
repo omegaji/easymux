@@ -52,3 +52,16 @@
 .pane-bar button image {
   -gtk-icon-size: 14px;
 }
+
+/*
+ * Which pane has keyboard focus. Like Ghostty (and cmux), the other panes'
+ * terminals are dimmed, and the focused pane's tab bar is a little brighter.
+ * With a single pane, it is always the focused one, so nothing is dimmed.
+ */
+.pane:not(.focused) .pane-terminals {
+  opacity: 0.7;
+}
+
+.pane.focused .pane-bar {
+  background-color: #26233a;
+}

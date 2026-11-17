@@ -105,6 +105,7 @@ impl Workspace {
         };
 
         workspace.add_pane(first_pane);
+        workspace.set_focused(first_pane);
         workspace.rebuild();
         workspace
     }
@@ -123,7 +124,7 @@ impl Workspace {
             Command::Split(pane, direction) => self.split(pane, direction),
             Command::NewTab => self.new_tab(self.focused),
             Command::NewTabIn(pane) => {
-                self.focused = pane;
+                self.set_focused(pane);
                 self.new_tab(pane);
             }
             Command::CloseFocusedTab => {
@@ -135,7 +136,7 @@ impl Workspace {
             Command::SelectTab(tab) => self.select_tab(tab),
             Command::TabFocused(tab) => {
                 if let Some(pane) = self.pane_of(tab) {
-                    self.focused = pane;
+                    self.set_focused(pane);
                 }
             }
             Command::TabTitleChanged(tab) => {
@@ -147,6 +148,15 @@ impl Workspace {
         Outcome::Continue
     }
 
+    // Make `pane` the focused pane: remember it, and update every pane's look
+    // (the others are dimmed). Every focus change goes through here.
+    fn set_focused(&mut self, pane: PaneId) {
+        self.focused = pane;
+        for (id, view) in &self.views {
+            view.set_focused(*id == pane);
+        }
+    }
+
     // Split `pane` in two. The new pane (with one new tab) goes to the
     // right or below, and gets the focus.
     fn split(&mut self, pane: PaneId, direction: SplitDirection) {
@@ -154,7 +164,7 @@ impl Workspace {
             return; // `pane` is not in the layout
         };
         self.add_pane(new_pane);
-        self.focused = new_pane;
+        self.set_focused(new_pane);
         self.rebuild();
     }
 
@@ -176,7 +186,7 @@ impl Workspace {
         if let Some(pane_tabs) = self.panes.get_mut(&pane) {
             pane_tabs.activate(tab);
         }
-        self.focused = pane;
+        self.set_focused(pane);
         self.refresh_tab_bar(pane);
         self.show_active_tab(pane);
     }
@@ -230,7 +240,7 @@ impl Workspace {
             } else {
                 panes_before[1]
             };
-            self.focused = neighbor;
+            self.set_focused(neighbor);
         }
         self.rebuild();
         Outcome::Continue
